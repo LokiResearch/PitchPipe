@@ -33,30 +33,28 @@
  * See online algorithm on Wikipedia:
  * https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
  */
-function RunningStatistics()
-{
-    this.count = 0.0;
-    this.mean = 0.0;
-    this.M2 = 0.0;
-    this.variance = 0.0;
-    this.ci95 = 0.0; 
-    this.max = -Infinity;
-
+class RunningStatistics {
+    constructor() {
+        this.count = 0.0;
+        this.mean = 0.0;
+        this.M2 = 0.0;
+        this.variance = 0.0;
+        this.ci95 = 0.0;
+        this.max = -Infinity;
+    }
     /**
      * Iteratively calculate mean and variance.
      */
-    this.update = function(newValue)
-    {
+    update(newValue) {
         this.count += 1.0;
         this.delta = newValue - this.mean;
         this.mean = this.mean + this.delta / this.count;
         this.delta2 = newValue - this.mean;
         this.M2 += this.delta * this.delta2;
-        this.max = Math.max(
-            this.max,
-            newValue);
+        
+        this.max = Math.max(this.max, newValue);
 
-        this.variance = this.M2/(this.count - 1.0);
+        this.variance = this.M2 / (this.count - 1.0);
         this.ci95 = 1.96 * Math.sqrt(this.variance / this.count);
     }
 }
@@ -65,27 +63,25 @@ function RunningStatistics()
  * Call every time input device is sampled to 
  * determine the average frame rate.
  */
-function FrameRateEstimator()
-{
-    var stats = new RunningStatistics()
-    var lastTime_ms = 0.0;
+class FrameRateEstimator {
+    constructor() {
+        var stats = new RunningStatistics();
+        var lastTime_ms = 0.0;
 
-    this.update = function()
-    {
-        var now = Date.now();
+        this.update = function () {
+            var now = Date.now();
 
-        if(lastTime_ms > 0.0)
-        {
-        	delta = now - lastTime_ms;
-            stats.update(delta);
-        }
+            if (lastTime_ms > 0.0) {
+                const delta = now - lastTime_ms;
+                stats.update(delta);
+            }
 
-        lastTime_ms = now;
-    }
+            lastTime_ms = now;
+        };
 
-    this.fps = function()
-    {
-        return 1000.0 / stats.mean;
+        this.fps = function () {
+            return 1000.0 / stats.mean;
+        };
     }
 }
 

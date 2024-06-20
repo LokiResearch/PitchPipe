@@ -1,0 +1,53 @@
+name: Build and deploy
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    container: node:21
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: install dependancies
+      run: |
+        rm -rf dist/
+        cp -r utils/ dist/
+        cp -r filters/ dist/
+        cp -r utilsOneEuro/ dist/
+        cp calibrator.js dist/
+        cp index.html dist/
+        cp LICENSE.txt dist/
+        cp main.css dist/
+        cp main.js dist/
+        cp target.js dist/
+
+    - name: Archive built files
+      uses: actions/upload-pages-artifact@v3
+      with:
+        name: 'github-pages'
+        path: dist
+
+  deploy:
+    needs: build
+
+    permissions:
+      contents: read
+      pages: write   
+      id-token: write 
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

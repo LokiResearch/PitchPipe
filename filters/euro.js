@@ -57,10 +57,6 @@ Grid = function(table) {
         bIdxLo = vals[1];
         bIdxHi = vals[2];
 
-        //console.log(jIdx, jIdxLo, jIdxHi)
-        //console.log(fcIdx, fcIdxLo, fcIdxHi)
-        //console.log(bIdx, bIdxLo, bIdxHi)
-
         ret = 0.0;
         weights = 0.0;
 
@@ -129,43 +125,53 @@ Grid = function(table) {
     };
 };
 
+const g = new Grid(fs60);
+
 /**
  * Simple exponential moving average filter,
  * with auto-tuner support.
  */
-function EuroFilter(min_cutoff_hz, beta) {
-    // Filtered position.
-    this.pos = null;
+class EuroFilter {
+    constructor(min_cutoff_hz=1, beta=1) {
+        // Filtered position.
+        this.pos = null;
 
-    // Filtered derivate.
-    this.derivate = null;
+        // Filtered derivate.
+        this.derivate = null;
 
-    // How aggressively to filter.
-    this.min_cutoff_hz = min_cutoff_hz;
+        // How aggressively to filter.
+        this.min_cutoff_hz = min_cutoff_hz;
 
-    // Smoothing for derivate.
-    this.derivate_cutoff_hz = 1.0;
+        // Smoothing for derivate.
+        this.derivate_cutoff_hz = 1.0;
 
-    // How rapidly to increase cutoff with velocity.
-    this.beta = beta;
+        // How rapidly to increase cutoff with velocity.
+        this.beta = beta;
 
-    // Timestamp of filtered position (last update).
-    this.timeStamp_s = 0.0;
+        // Timestamp of filtered position (last update).
+        this.timeStamp_s = 0.0;
 
-    // Load up table for this test.
-    var grid = new Grid(fs60);
+        // Load up table for this test.
+        
+    }
 
     /**
      * Determine smoothing factor based on cutoff and time step.
      */
-    this.alpha = function(cutoff_hz, delta_s) {
+    alpha (cutoff_hz, delta_s) {
         return 1.0 - Math.exp(-2.0 * Math.PI * cutoff_hz * delta_s);
-    };
+    }
+
+    updateParameters(min_cutoff_hz, beta){
+
+        this.min_cutoff_hz = min_cutoff_hz;
+        this.beta = beta
+    }
 
     /**
      * Invoke after each input device reading.
      */
-    this.filter = function(pos, timeStamp_s) {
+    filter(pos, timeStamp_s) {
         // set initial value
         if (this.pos === null) {
             this.pos = pos;
@@ -175,18 +181,18 @@ function EuroFilter(min_cutoff_hz, beta) {
         }
 
         // Calculate time delta.
-        duration_s = timeStamp_s - this.timeStamp_s;
+        const duration_s = timeStamp_s - this.timeStamp_s;
         this.timeStamp_s = timeStamp_s;
 
         // Calculate derivate and smooth it.
-        derivate = (pos - this.pos) / duration_s;
+        const derivate = (pos - this.pos) / duration_s;
 
-        alpha = this.alpha(this.derivate_cutoff_hz, duration_s);
+        let alpha = this.alpha(this.derivate_cutoff_hz, duration_s);
 
         this.derivate = alpha * derivate + (1.0 - alpha) * this.derivate;
 
         // Determine velocity based cutoff and smooth position
-        cutoff = this.min_cutoff_hz + this.beta * Math.abs(this.derivate);
+        const cutoff = this.min_cutoff_hz + this.beta * Math.abs(this.derivate);
 
         alpha = this.alpha(cutoff, duration_s);
 
@@ -194,25 +200,24 @@ function EuroFilter(min_cutoff_hz, beta) {
 
         this.pos = alpha * pos + (1.0 - alpha) * this.pos;
         return this.pos;
-    };
+    }
 
     /**
      * Measure the edge response: how long it takes
      * the filter to rise from zero to the given amplitude.
      */
-    this.lag_s = function(
-        targetPrecision,
-        noiseStddev,
-        amplitude,
-        sampleRate_hz,
-        handleRinging
-    ) {
+    lag_s(targetPrecision,
+            noiseStddev,
+            amplitude,
+            sampleRate_hz,
+            handleRinging) {
+
         this.pos = null;
 
-        cnt = 0.0;
-        delta_s = 1.0 / sampleRate_hz;
+        let cnt = 0.0;
+        const delta_s = 1.0 / sampleRate_hz;
 
-        timeStamp_s = 0.0;
+        let timeStamp_s = 0.0;
 
         // Warm at zero.
         for (var ii = 0; ii < 2; ii++) {
@@ -229,16 +234,13 @@ function EuroFilter(min_cutoff_hz, beta) {
 
             cnt += 1.0;
 
-            delta1 = Math.abs(this.pos - amplitude);
+            const delta1 = Math.abs(this.pos - amplitude);
 
-            if(handleRinging)
-            {
+            let delta2 = 0.0;
+
+            if (handleRinging) {
                 alpha = this.lastAlpha;
                 delta2 = alpha * noiseStddev + (1.0 - alpha) * 0.0;
-            }
-            else
-            {
-                delta2 = 0.0;
             }
 
             if (Math.max(delta1, delta2) < targetPrecision) {
@@ -247,43 +249,41 @@ function EuroFilter(min_cutoff_hz, beta) {
 
             timeStamp_s += delta_s;
         }
-    };
+    }
 
     /**
      * Given a specified target precision, noise level,
      * amplitude, and sample rate, determine how the
      * smoothing parameter should be set.
      */
-    this.tune = function(
-        maxTargetPrecision,
-        maxLag_s,
-        noiseVariance,
-        maxAmplitude,
-        sampleRate_hz,
-        handleRinging=false)
-    {
-        targetPrecision = maxTargetPrecision;
-        noiseStddev = Math.sqrt(noiseVariance);
+    tune (maxTargetPrecision,
+            maxLag_s,
+            noiseVariance,
+            maxAmplitude,
+            sampleRate_hz,
+            handleRinging = false) {
 
-        bestPrecision = Infinity;
-        bestLag_s = Infinity;
-        bestMinCutoff_hz = null;
-        bestBeta = 1.1;
+        let targetPrecision = maxTargetPrecision;
+        const noiseStddev = Math.sqrt(noiseVariance);
+
+        let bestPrecision = Infinity;
+        let bestLag_s = Infinity;
+        let bestMinCutoff_hz = null;
+        let bestBeta = 1.1;
 
         for (; bestPrecision === Infinity; targetPrecision += 1.0 / 3) {
             for (var min_hz = 0.1; min_hz < 4.0; min_hz += 0.01) {
                 this.min_cutoff_hz = min_hz;
 
-                beta = 1.0;
+                let beta = 1.0;
                 for (var scale = 1.0; scale <= 5; scale += 1.0) {
-                    step = Math.pow(10.0, -scale);
-                    step /= 4.0;
+                    const step = Math.pow(10.0, -scale) / 4.0;
 
                     for (var ii = 0.0; ii < 9 * 4.0; ii++) {
                         beta -= step;
                         beta = Math.round(beta * 1e6) / 1e6;
 
-                        precision = grid.precision(noiseStddev, min_hz, beta);
+                        const precision = g.precision(noiseStddev, min_hz, beta);
 
                         if (precision > targetPrecision) {
                             continue;
@@ -291,7 +291,7 @@ function EuroFilter(min_cutoff_hz, beta) {
 
                         this.beta = beta;
 
-                        lag_s = this.lag_s(
+                        const lag_s = this.lag_s(
                             targetPrecision,
                             noiseStddev,
                             maxAmplitude,
@@ -299,27 +299,23 @@ function EuroFilter(min_cutoff_hz, beta) {
                             handleRinging
                         );
 
-                        accept = true;
+                        let accept = true;
 
                         // if we already have a lag that is less than the 
                         // max, then take new result only if precision is better
-                        if(bestLag_s <= maxLag_s)
-                        {
-                            if(lag_s >= maxLag_s)
-                            {
+                        if (bestLag_s <= maxLag_s) {
+                            if (lag_s >= maxLag_s) {
                                 accept = false;
                             }
-                            else if(precision > bestPrecision)
-                            {
+                            else if (precision > bestPrecision) {
                                 accept = false;
                             }
                         }
-                        else if (lag_s > bestLag_s)
-                        {
+                        else if (lag_s > bestLag_s) {
                             accept = false;
                         }
 
-                        if(accept == false)
+                        if (accept == false)
                             continue;
 
                         bestPrecision = precision;
@@ -349,8 +345,11 @@ function EuroFilter(min_cutoff_hz, beta) {
         console.log("precision: " + bestPrecision);
         console.log("lag_s: " + bestLag_s);
         console.log("\n");
-    };
+
+        return {"min_cutoff_hz":bestMinCutoff_hz, "beta":bestBeta};
+    }
 }
+
 
 // Description of this filter.
 EuroFilter.description = "1€ Filter";
@@ -383,15 +382,6 @@ EuroFilter.parameters = [
         def: 0.0,
         step: 0.0001,
         logstep: true
-    },
-    {
-        name: "noise",
-        description: "Noise",
-        min: 0,
-        max: 16,
-        def: 8,
-        step: 1,
-        logstep: false
     }
 ];
 
