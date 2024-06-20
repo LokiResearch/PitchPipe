@@ -16,8 +16,16 @@ jobs:
     - uses: actions/checkout@v3
     - name: install dependancies
       run: |
-        rm -rf dist
-        cp -r . dist
+        rm -rf dist/
+        cp -r utils/ dist/
+        cp -r filters/ dist/
+        cp -r utilsOneEuro/ dist/
+        cp calibrator.js dist/
+        cp index.html dist/
+        cp LICENSE.txt dist/
+        cp main.css dist/
+        cp main.js dist/
+        cp target.js dist/
 
     - name: Archive built files
       uses: actions/upload-pages-artifact@v3
