@@ -30,16 +30,16 @@
 
 
 const calibrationStates = {
-    WAIT_TO_START: 'wait to start (next to continu)',
-    START: 'start',
-    ESTIMATE_SAMPLE_RATE: 'estimate sample rate (fps)',
-    ESTIMATE_NOISE_PREPARE: 'estimate noise (next to continu)',
-    ESTIMATE_NOISE: "estimate noise don't move",
-    ESTIMATE_AMPLITUDE_PREPARE: 'estimate amplitude (next to continu)',
-    ESTIMATE_AMPLITUDE: 'estimate amplitude click target',
-    ESTIMATE_PARAMETERS: 'estimate parameters',
-    ESTIMATE_TUNED: 'estimate tuned',
-    COMPLETE: 'complete (next to restart)',
+    WAIT_TO_START: "Wait to start, press 'n' to start the automatic tuning procedure",
+    START: 'Start',
+    ESTIMATE_SAMPLE_RATE: 'Estimate sample rate...',
+    ESTIMATE_NOISE_PREPARE: "Press 'n' to start the automatic tuning procedure. DO NOT MOVE your mouse until prompted",
+    ESTIMATE_NOISE: "Estimating jitter. DO NOT MOVE YOUR MOUSE. This part will take approximately 10 to 20 seconds to complete.",
+    ESTIMATE_AMPLITUDE_PREPARE: "*Training* Click on the (red) target as quickly and accurately as possible. Press 'n' when you are ready for the real test.",
+    ESTIMATE_AMPLITUDE: 'Click on the (red) target as quickly and accurately as possible until next prompt appears.',
+    ESTIMATE_PARAMETERS: 'Estimate parameters',
+    ESTIMATE_TUNED: 'Estimate tuned',
+    COMPLETE: "Tuning complete, press 'n' to restart the automatic tuning procedure",
 };
 
 /**
@@ -49,23 +49,23 @@ const calibrationStates = {
  */
 class EstimateSampleRate {
     constructor() {
-        var frameRateEstimator = new FrameRateEstimator();
-
-        /**
-         * Feed each sampling into this update function.
-         */
-        this.update = function () {
-            frameRateEstimator.update();
-        };
-
-        /**
-         * Get most recent sampling rate estimate.
-         */
-        this.sample_hz = function () {
-            return Math.round(frameRateEstimator.fps());
-        };
+        this.frameRateEstimator = new FrameRateEstimator();
     }
-};
+
+    /**
+     * Feed each sampling into this update function.
+     */
+    update() {
+        this.frameRateEstimator.update();
+    }
+
+    /**
+     * Get most recent sampling rate estimate.
+     */
+    sample_hz() {
+        return Math.round(this.frameRateEstimator.fps());
+    }
+}
 
 /**
  * This object is used to estimate the maximum
@@ -74,30 +74,28 @@ class EstimateSampleRate {
  */
 class EstimateAmplitude {
     constructor(noiseStddev) {
-        var distanceEstimatorX = new MaximumDistanceEstimator();
-        var distanceEstimatorY = new MaximumDistanceEstimator();
-        var noiseStddev = noiseStddev;
-
-        /**
-         * Feed each sampling into this update function.
-         */
-        this.update = function (
-            posX,
-            posY) {
-            distanceEstimatorX.update(posX, noiseStddev);
-            distanceEstimatorY.update(posY, noiseStddev);
-        };
-
-        /**
-         * Get most recent maximum amplitude estimate.
-         */
-        this.amplitude = function () {
-            return Math.max(
-                distanceEstimatorX.velocity(),
-                distanceEstimatorY.velocity());
-        };
+        this.distanceEstimatorX = new MaximumDistanceEstimator();
+        this.distanceEstimatorY = new MaximumDistanceEstimator();
+        this.noiseStddev = noiseStddev;
     }
-};
+
+    /**
+     * Feed each sampling into this update function.
+     */
+    update(posX, posY) {
+        this.distanceEstimatorX.update(posX, this.noiseStddev);
+        this.distanceEstimatorY.update(posY, this.noiseStddev);
+    }
+
+    /**
+     * Get most recent maximum amplitude estimate.
+     */
+    amplitude() {
+        return Math.max(
+            this.distanceEstimatorX.velocity(),
+            this.distanceEstimatorY.velocity());
+    }
+}
 
 /**
  * Estimate noise in signal. The user ought be asked
@@ -106,12 +104,11 @@ class EstimateAmplitude {
  * the noise estimate.
  */
 class EstimateNoise {
-    constructor(sample_hz,
-        threshold = 0.01) {
-        var noiseEstimatorsX = [];
-        var noiseEstimatorsY = [];
-        var stats = new RunningStatistics();
-        var threshold = threshold;
+    constructor(sample_hz, threshold = 0.01) {
+        this.noiseEstimatorsX = [];
+        this.noiseEstimatorsY = [];
+        this.stats = new RunningStatistics();
+        this.threshold = threshold;
 
         // The Nyquist frequency is half the sampling rate.
         // We can monitor those frequencies that fall 
@@ -122,57 +119,54 @@ class EstimateNoise {
 
         const frequency_cnt = sample_hz / 2.0 - 10.0;
 
-        for (var ii = 0.0; ii < frequency_cnt; ii += 1) {
-            noiseEstimatorsX.push(new NoiseEstimator(ii, sample_hz));
-            noiseEstimatorsY.push(new NoiseEstimator(ii, sample_hz));
+        for (let ii = 0.0; ii < frequency_cnt; ii += 1) {
+            this.noiseEstimatorsX.push(new NoiseEstimator(ii, sample_hz));
+            this.noiseEstimatorsY.push(new NoiseEstimator(ii, sample_hz));
         }
+    }
 
-        /**
-         * Update estimate with new samples. Note, we assume
-         * noise is homogeneous across X and Y.
-         *
-         * Returns true once the 95% CI width is
-         * within a given threshold of the mean.
-         */
-        this.update = function (
-            posX,
-            posY) {
-            var ii = 0;
+    /**
+     * Update estimate with new samples. Note, we assume
+     * noise is homogeneous across X and Y.
+     *
+     * Returns true once the 95% CI width is
+     * within a given threshold of the mean.
+     */
+    update(posX, posY) {
 
-            for (ii = 0; ii < noiseEstimatorsX.length; ii++) {
-                noiseEstimatorsX[ii].update(posX);
-                noiseEstimatorsY[ii].update(posY);
+            for (let ii = 0; ii < this.noiseEstimatorsX.length; ii++) {
+                this.noiseEstimatorsX[ii].update(posX);
+                this.noiseEstimatorsY[ii].update(posY);
 
-                const varX = noiseEstimatorsX[ii].variance();
-                const varY = noiseEstimatorsY[ii].variance();
+                const varX = this.noiseEstimatorsX[ii].variance();
+                const varY = this.noiseEstimatorsY[ii].variance();
 
                 if (varX == 0) {
                     continue;
                 }
 
-                stats.update(varX);
-                stats.update(varY);
+                this.stats.update(varX);
+                this.stats.update(varY);
             }
 
-            const ratio = (2.0 * stats.ci95) / stats.mean;
-            return (ratio < threshold);
-        };
+            const ratio = (2.0 * this.stats.ci95) / this.stats.mean;
+            return (ratio < this.threshold);
+    }
 
-        /**
-         * Return white noise variance estimate,
-         * which is the mean of our PSD estimates.
-         */
-        this.variance = function () {
-            return stats.mean;
-        };
+    /**
+     * Return white noise variance estimate,
+     * which is the mean of our PSD estimates.
+     */
+    variance() {
+        return this.stats.mean;
+    }
 
-        /**
-         * For debug, display purposes.
-         */
-        this.countDown = function () {
-            ratio = (2.0 * stats.ci95) / stats.mean;
-            return ratio - threshold;
-        };
+    /**
+     * For debug, display purposes.
+     */
+    countDown() {
+            const ratio = (2.0 * this.stats.ci95) / this.stats.mean;
+            return ratio - this.threshold;
     }
 }
 
@@ -234,7 +228,7 @@ class RunCalibrationProcedure {
 
                 if (delta_ms > 2000.0) {
                     this.currentState = calibrationStates.ESTIMATE_NOISE_PREPARE;
-                    this.nextState = calibrationStates.ESTIMATE_SAMPLE_RATE;
+                    this.nextState = calibrationStates.ESTIMATE_NOISE_PREPARE;
                     const sample_hz = this.sampleRateEstimator.sample_hz();
                     console.log('Sample rate: ' + sample_hz);
                     this.noiseEstimator = new EstimateNoise(sample_hz);
@@ -305,8 +299,6 @@ class RunCalibrationProcedure {
                         this.currentState = calibrationStates.ESTIMATE_PARAMETERS;
                     }
             }
-
-
 
             // Finally, tune the filter!
             else if (this.currentState == calibrationStates.ESTIMATE_PARAMETERS) {

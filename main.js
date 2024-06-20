@@ -60,7 +60,7 @@ $(() => {
             
             // Pitch Pipe button
             const nextStateLetter = "n"
-            this.$configurator.append($('<h1/>').text(`PitchPipe (${nextStateLetter})`)).append($(`<button id="nextStateButton" onclick="window.calibrator.nextProcedure()">Next State</button>`));
+            this.$configurator.append($('<h1/>').text(`PitchPipe`)).append($(`<button id="nextStateButton" onclick="window.calibrator.nextProcedure()">Press (${nextStateLetter}) for next State</button>`));
             const kbdchar = nextStateLetter.charCodeAt(0);
             $(window).keypress((e) => {
                 if (e.which == kbdchar) {
@@ -118,11 +118,19 @@ $(() => {
             ctx.fill()
 
             // draw state
-            ctx.font = "16px serif";
-            ctx.fillStyle = "black";
-            ctx.fillText(calibrator.procedure.currentState, 10, 20);
 
-            calibrator.procedure.update(this.filter.position.x, this.filter.position.y)
+            const fontSize = 16;
+            const i = calibrator.procedure.currentState.length * fontSize * 0.5;
+
+            ctx.fillStyle = "black";
+            ctx.fillRect(playground.width / 2 - i / 2, 8, i, (fontSize * 1.5));
+            ctx.fillStyle = "white";
+            ctx.textBaseline = "middle";
+            ctx.textAlign = "center";
+            ctx.font = fontSize.toString() + "px arial";
+            ctx.fillText(calibrator.procedure.currentState, playground.width / 2, 20);
+
+            calibrator.procedure.update(this.filter.position.x, this.filter.position.y);
 
         }
         updateTimer() {

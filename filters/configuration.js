@@ -12,7 +12,6 @@ class FilterConfiguration {
 
         this.ref('currentX', 0);
         this.ref('currentY', 0);
-
         
         this.position = { x: 0, y: 0 };
 
