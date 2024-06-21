@@ -17,9 +17,10 @@ jobs:
     - name: install dependancies
       run: |
         rm -rf dist/
-        cp -r utils/ dist/
-        cp -r filters/ dist/
-        cp -r utilsOneEuro/ dist/
+        mkdir dist/
+        cp -r utils/ dist/utils/
+        cp -r filters/ dist/filters/
+        cp -r utilsOneEuro/ dist/utilsOneEuro/
         cp calibrator.js dist/
         cp index.html dist/
         cp LICENSE.txt dist/
